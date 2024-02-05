@@ -1,36 +1,35 @@
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# Problem
 
-## Getting Started
+Cannot use default NodeJS global require at runtime in webpack
 
-First, run the development server:
+# How to reproduce
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Change .env-template => .env and fill in values
+- `npm install` (this was not a pnpm issue after all!)
+- `npm run dev`
+- Open `http://localhost:3000/api` in the browser and observe the problem
+
+# Why
+
+Read this [https://stackoverflow.com/questions/58215361/importing-from-outside-webpack-runtime-importing](https://stackoverflow.com/questions/58215361/importing-from-outside-webpack-runtime-importing).
+
+The `require(provider).default` line at [https://github.com/MagnivOrg/prompt-layer-js/blob/master/src/index.ts#L32](https://github.com/MagnivOrg/prompt-layer-js/blob/master/src/index.ts#L32) breaks when using webpack via NextJS.
+
+# Solution
+
+Ensure the final build of `promptlayer-js` uses `__non_webpack_require__` instead of `require`. We can see that this works by cutting off the dev server, manually opening `node_modules/promptlayer/dist/index.js`, find/replace `a=require(o)` to `a=__non_webpack_require__(o)`, and then restarting the dev server with `npm run dev`:
+
+# Personal opinion
+
+Considering the diversity of ways that JS code is compiled/transpiled in the wild, I think using `require` dynamically is rarely a good idea inside library code. Ideally, you all would support an API more like this:
+
+```typescript
+import { initPromptlayer } from "promptlayer";
+import openai from "openai";
+
+// note: as a bonus, doing it this way would ensure that types could
+// be preserved via Typescript generics on your end. No need for a user to cast like
+// in the current getting started example.
+const promptlayer = initPromptLayer({ openai });
+const openai = new promptlayer.OpenAI();
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/basic-features/font-optimization) to automatically optimize and load Inter, a custom Google Font.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/deployment) for more details.
